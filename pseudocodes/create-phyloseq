@@ -1,0 +1,104 @@
+install.packages(c('readxl', 'tidyverse', 'dplyr', 'vegan', 'ggpubr', "writexl"))
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(c('phyloseq', ask = F, update = F))
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(c('microbiome'))
+
+library(writexl)
+library(readxl)
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(phyloseq)
+library(microbiome)
+library(vegan)
+library(stringr)
+library(lefser)
+library(tidyverse)
+
+setwd("~/Desktop/Mod5_Data_Analysis/HHS_IE_combined")
+
+main=read.table('HHS_IE_merged_estimated_number_read.txt',header=TRUE,sep="\t")
+t = separate(main,X.clade_name, into = c("Kingdom","Phylum", "Class", "Order", "Family", "Genus", "Species"), sep="\\|")
+t=t[!is.na(t$Species), ]
+t=t[!duplicated(t$Species),]
+t = t %>% mutate(Kingdom = str_replace(Kingdom, 'k__',''),
+                 Phylum = str_replace(Phylum, 'p__',''),
+                 Class = str_replace(Class, 'c__',''),
+                 Order = str_replace(Order, 'o__',''),
+                 Family = str_replace(Family, 'f__',''),
+                 Genus = str_replace(Genus, 'g__',''),
+                 Species = str_replace(Species, 's__',''))
+names(t)[names(t) == 'X272IE_S111_profile_IEcount.txt'] <- "272IE"
+names(t)[names(t) == 'X273IE_S112_profile_IEcount.txt'] <- "273IE"
+names(t)[names(t) == 'X290IE_S113_profile_IEcount.txt'] <- "290IE"
+names(t)[names(t) == 'X293IE_S13_profile_IEcount.txt'] <- "293IE"
+names(t)[names(t) == 'X294IE_S114_profile_IEcount.txt'] <- "294IE"
+names(t)[names(t) == 'X295IE_S14_profile_IEcount.txt'] <- "295IE"
+names(t)[names(t) == 'X296IE_S115_profile_IEcount.txt'] <- "296IE"
+names(t)[names(t) == 'SRS013942_profile_count.txt'] <- "SRS013942"
+names(t)[names(t) == 'SRS014468_profile_count.txt'] <- "SRS014468"
+names(t)[names(t) == 'SRS014692_profile_count.txt'] <- "SRS014692"
+names(t)[names(t) == 'SRS015055_profile_count.txt'] <- "SRS015055"
+names(t)[names(t) == 'SRS019120_profile_count.txt'] <- "SRS019120"
+names(t)[names(t) == 'SRS065518_profile_count.txt'] <- "SRS065518"
+names(t)[names(t) == 'SRS104275_profile_count.txt'] <- "SRS104275"
+names(t)[names(t) == 'SRS147126_profile_count.txt'] <- "SRS147126"
+
+t=as.data.frame(t[,-which(names(t) %in% c("SRS015055", "SRS019120"))])
+t = t %>% mutate(Genus = str_replace(Genus, 'Clostridiales_Family_XIII_Incertae_Sedis_unclassified','Clostridiales**'))
+
+x=1:dim(t)[1]
+OTUs= paste("OTU",x)
+t=add_column(t, OTUs = OTUs, .before = "clade_taxid")
+t[is.na(t)] = 0
+write_xlsx(t,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_Estimated_number_TX.xlsx")
+
+
+
+OTU =as.data.frame(t[,-which(names(t) %in% c("Kingdom","Phylum", "Class", "Order", "Family", "Genus","Type","clade_taxid"))])
+write_xlsx(OTU,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_OTU.xlsx")
+
+#OTU=read_xlsx("IE_OTU.xlsx", sheet=1) %>% as.data.frame()
+row.names(OTU) = OTU$OTUs
+OTU =as.data.frame(OTU[,-which(names(OTU) %in% c("OTUs","Species"))])
+OTU [is.na(OTU)] = 0
+#names(OTU) = gsub(pattern = "_profile_PIcount.txt", replacement = "", x = names(OTU))
+names(OTU) = gsub(pattern = "_profile_IEcount.txt", replacement = "", x = names(OTU))
+names(OTU) = gsub(pattern = "_profile_count.txt", replacement = "", x = names(OTU))
+
+OTU_modify<-t(OTU)%>%as.data.frame
+  
+OTU_modify2<-OTU_modify[,-which(names(OTU_modify) %in% c("OTU 196","OTU 197", "OTU 198", "OTU 199", "OTU 200", "OTU 202", "OTU 205", 
+                             "OTU 206", "OTU 207", "OTU 210", "OTU 212", "OTU 213", "OTU 214", "OTU 215",
+                             "OTU 216", "OTU 219", "OTU 220"))]
+OTU_modify3<-t(OTU_modify2)%>%as.data.frame
+CountMatrix = OTU_modify3 %>% as.matrix()
+mode(CountMatrix) <- 'integer'
+
+
+TAX =as.data.frame(t[,which(names(t) %in% c("Kingdom","Phylum", "Class", "Order", "Family", "Genus","Species","OTUs"))])
+write_xlsx(TAX,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_TAXA.xlsx")
+#TAX = read_xlsx("IE_TAXA.xlsx", sheet=1) %>% as.data.frame()
+row.names(TAX) = TAX$OTUs
+tax_modify = t(TAX)%>%as.data.frame
+tax_modify2<-tax_modify[,-which(names(tax_modify) %in% c("OTU 196","OTU 197", "OTU 198", "OTU 199", "OTU 200", "OTU 202", "OTU 205", 
+                                                         "OTU 206", "OTU 207", "OTU 210", "OTU 212", "OTU 213", "OTU 214", "OTU 215",
+                                                         "OTU 216", "OTU 219", "OTU 220"))]
+tax_modify3<-t(tax_modify2)%>%as.data.frame
+tax_modify3 =as.data.frame(tax_modify3[,-which(names(tax_modify3) %in% c("OTUs"))])
+TaxaMatrix <- tax_modify3 %>% as.matrix()
+
+Metadata <- read_xlsx("~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/Metadata_HHS_IE.xlsx", sheet="Merged_Projects") %>% as.data.frame()
+rownames(Metadata) <- Metadata$SampleID
+
+
+otuTABLE <- otu_table(CountMatrix, taxa_are_rows = TRUE)
+taxTABLE <- tax_table(TaxaMatrix)
+sampleDATA <- sample_data(Metadata)
+
+
+phylo_obj <- phyloseq(otuTABLE, taxTABLE, sampleDATA)
