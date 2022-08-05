@@ -1,0 +1,554 @@
+---
+title: "STH-IE_visualisation"
+author: "Phoebe Cheong"
+date: "05/08/2022"
+output: html_document
+---
+Files can be downloaded from:https://github.com/chikusquish/MHDprojectIE2022
+
+## STH-IE 3. Create phyloseq object
+
+**Install packages** for this session. Packages are as shown in: https://github.com/chikusquish/MHDprojectIE2022/blob/main/R-pseudocodes
+
+**Load libraries** for this session
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+library(phyloseq)
+library(ggplot2)
+library(tidyverse)
+library(ggpubr)
+library(ggsci)
+library(stringr)
+library(dutchmasters)
+library(RColorBrewer)
+load("STH-IE_visualisation.RData")
+```
+
+## 1. Create object for generation of figures
+
+```{r}
+phylo_obj@sam_data[1:3,1:3]
+
+pd <- psmelt(phylo_obj)
+
+```
+
+Figure 3.7a
+
+```{r, warning=FALSE, message=FALSE}
+my_comparisons <- list( c("Definite_IE", "Healthy"), c("Definite_IE", "Highrisk_IE"), c("Healthy", "Highrisk_IE") )
+boxplot_shannon<-ggplot(data = Adiv, aes(x = IE_dx, y = Shannon, fill=IE_dx)) + 
+                        geom_boxplot(width=0.5)+
+                        theme_minimal()+
+                        theme(legend.position = "none")+
+                        stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white")+
+                        geom_jitter(shape=1, position=position_jitter(0.1))+
+                        ggtitle("Shannon Index by Diagnosis") +
+                        scale_x_discrete(name= "Diagnosis", 
+                                         limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                                         labels=c("Definite IE", "Healthy", "High risk IE"))+
+                        scale_fill_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                                        values=c("skyblue","orange","purple"))+
+                        stat_compare_means(comparisons=my_comparisons, label.y=c(4.2, 4.6, 4.4))
+
+boxplot_shannon
+```
+
+Figure 3.7b
+
+```{r, warning=FALSE, message=FALSE}
+boxplot_chao1<- ggplot(data = Adiv, aes(x = IE_dx, y = Chao1, fill=IE_dx)) + 
+                        geom_boxplot(width=0.5)+
+                        theme_minimal()+
+                        theme(legend.position = "none")+
+                        stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white")+
+                        geom_jitter(shape=1, position=position_jitter(0.1))+
+                        ggtitle("Chao1 Index by Diagnosis") +
+                        scale_x_discrete(name= "Diagnosis", 
+                                          limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                                          labels=c("Definite IE", "Healthy", "High risk IE"))+
+                        scale_fill_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                                          values=c("skyblue","orange","purple"))+
+                        stat_compare_means(comparisons=my_comparisons, label.y=c(160,180,170))
+boxplot_chao1
+```
+
+Figure 3.7c
+
+```{r, warning=FALSE, message=FALSE}
+boxplot_invsimp<-ggplot(data = Adiv, aes(x = IE_dx, y = InvSimpson, fill=IE_dx)) + 
+                  geom_boxplot(width=0.5)+
+                  theme_minimal()+
+                  theme(legend.position = "none")+
+                  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white")+
+                  geom_jitter(shape=1, position=position_jitter(0.1))+
+                  ggtitle("InvSimpson Index by Diagnosis") +
+  scale_x_discrete(name= "Diagnosis", 
+                   limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                   labels=c("Definite IE", "Healthy", "High risk IE"))+
+  scale_fill_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                    values=c("skyblue","orange","purple"))+
+  stat_compare_means(comparisons=my_comparisons, label.y=c(33, 38, 35))
+boxplot_invsimp
+```
+
+Figure 3.7d
+
+```{r, warning=FALSE, message=FALSE}
+boxplot_SEI<-ggplot(data = Adiv, aes(x = IE_dx, y = Evenness, fill=IE_dx)) + 
+  geom_boxplot(width=0.5)+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white")+
+  geom_jitter(shape=1, position=position_jitter(0.1))+
+  ggtitle("Shannon Evenness Index by Diagnosis") +
+  scale_x_discrete(name= "Diagnosis", 
+                   limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                   labels=c("Definite IE", "Healthy", "High risk IE"))+
+  scale_fill_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                    values=c("skyblue","orange","purple"))+
+  stat_compare_means(comparisons=my_comparisons, label.y=c(0.84, 0.90, 0.87))
+boxplot_SEI
+```
+
+**Generate tools for beta diversity visualisation**
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+library("phyloseq")
+library("ggplot2")
+library("dplyr")
+library("ggpubr")
+library("Matrix")
+library("reshape2")
+library("vegan")
+
+phylo2=phylo_obj
+relab_genera = transform_sample_counts(phylo2, function(x) x / sum(x) * 100) 
+head(otu_table(relab_genera)[,1:6])
+
+sample_data(phylo2)$IE_dx<- factor((sample_data(phylo_obj)$IE_dx), levels=c("Definite_IE", "Healthy", "Highrisk_IE"))
+abrel_bray <- phyloseq::distance(relab_genera, method = "bray")
+abrel_bray <- as.matrix(abrel_bray)
+head(abrel_bray)[,1:6] 
+
+sub_dist <- list()
+relab_genera = transform_sample_counts(phylo2, function(x) x / sum(x) * 100) ### run again to ensure the loop works
+groups_all <- sample_data(relab_genera)$IE_dx
+
+##### below for-loop must all be highlighted to run otherwise df.bray shows error ######
+for (group in levels(groups_all)) { 
+  row_group <- which(groups_all == group)
+  sample_group <- sample_names(relab_genera)[row_group]
+  sub_dist[[group]] <- abrel_bray[sample_group, sample_group]
+  sub_dist[[group]][!lower.tri(sub_dist[[group]])] <- NA
+}
+
+braygroups<- melt(sub_dist)
+df.bray <- braygroups[complete.cases(braygroups), ]
+df.bray$L1 <- factor(df.bray$L1, levels=names(sub_dist))
+
+head(df.bray)
+```
+
+Figure 3.7e Beta diversity box plot
+
+```{r, warning=FALSE, message=FALSE}
+df.bray$Diagnosis<-df.bray$L1
+betdiv_boxplot1<-ggplot(df.bray, aes(x=Diagnosis, y=value, col=Diagnosis)) +
+                    geom_jitter() + 
+                    geom_boxplot(alpha=0.6) +  
+                    ylab("Bray-Curtis diversity") +
+                    xlab("Diagnosis")+
+                    ggtitle("Bray-Curtis Diversity in Salivary Microbiome of \nHealthy Samples and Cardiac Patients")+
+                    theme_minimal()+
+                    theme(plot.title=element_text(hjust=0.5),
+                          legend.position="none",
+                          axis.text.x=element_text(hjust=0.5,vjust=1,size=10), 
+                          axis.text.y=element_text(size=10))+
+                    scale_color_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                                      values=c("skyblue", "orange", "purple"))+
+                    scale_x_discrete(limits=c("Definite_IE", "Healthy", "Highrisk_IE"), 
+                                     labels=c("Definite IE", "Healthy",  "High risk IE"))+
+                    stat_compare_means(method="wilcox.test", 
+                                       comparisons = my_comparisons, 
+                                       label.y = c(1.0, 1.10, 1.05))
+
+betdiv_boxplot1
+```
+
+Figure 3.7f Beta diversity PCoA plot
+
+```{r, warning=FALSE, message=FALSE}
+ord = ordinate(relab_genera, method="PCoA", distance = "bray")
+betdiv_pcoa<-plot_ordination(relab_genera, ord, 
+                              color = "IE_dx", 
+                              shape="IE_dx") + 
+                            geom_point(size=3) + 
+                            stat_ellipse(aes(group=IE_dx))+
+                            theme_minimal()+
+                            theme(legend.position = "top",
+                                  plot.title=element_text(hjust=0.5))+
+                            scale_color_manual(limits=c("Definite_IE", "Healthy", "Highrisk_IE"),
+                            values=c("skyblue", "orange", "purple"))+
+                            scale_fill_manual(name="Diagnosis")+
+                            ggtitle("PCoA Plot of Salivary Microbial Diversity in \nHealthy Samples and Cardiac Patients")
+  
+
+betdiv_pcoa
+```
+Generate heattree package
+
+```{r, results='hide',warning=FALSE, message=FALSE}
+library("metacoder")
+s=main
+
+names(s)[names(s) == 'X272IE_S111_profile_IEcount.txt'] <- "272IE"
+names(s)[names(s) == 'X273IE_S112_profile_IEcount.txt'] <- "273IE"
+names(s)[names(s) == 'X290IE_S113_profile_IEcount.txt'] <- "290IE"
+names(s)[names(s) == 'X293IE_S13_profile_IEcount.txt'] <- "293IE"
+names(s)[names(s) == 'X294IE_S114_profile_IEcount.txt'] <- "294IE"
+names(s)[names(s) == 'X295IE_S14_profile_IEcount.txt'] <- "295IE"
+names(s)[names(s) == 'X296IE_S115_profile_IEcount.txt'] <- "296IE"
+names(s)[names(s) == 'SRS013942_profile_count.txt'] <- "SRS013942"
+names(s)[names(s) == 'SRS014468_profile_count.txt'] <- "SRS014468"
+names(s)[names(s) == 'SRS014692_profile_count.txt'] <- "SRS014692"
+names(s)[names(s) == 'SRS015055_profile_count.txt'] <- "SRS015055"
+names(s)[names(s) == 'SRS019120_profile_count.txt'] <- "SRS019120"
+names(s)[names(s) == 'SRS065518_profile_count.txt'] <- "SRS065518"
+names(s)[names(s) == 'SRS104275_profile_count.txt'] <- "SRS104275"
+names(s)[names(s) == 'SRS147126_profile_count.txt'] <- "SRS147126"
+s=as.data.frame(s[,-which(names(s) %in% c("SRS015055", "SRS019120"))])
+
+taxmapobj <- parse_tax_data(s,
+                            class_cols = "X.clade_name", # the column that contains taxonomic information
+                            class_sep = "|", # The character used to separate taxa in the classification
+                            class_regex = "^(.+)__(.+)$", # Regex identifying where the data for each taxon is
+                            class_key = c(tax_rank = "info", # A key describing each regex capture group
+                                          tax_name = "taxon_name"))
+
+print(taxmapobj)
+
+
+taxmapobj$data$tax_data <- zero_low_counts(taxmapobj, dataset = "tax_data", min_count = 5)
+
+metadata2=Metadata
+print(metadata2)
+no_reads <- rowSums(taxmapobj$data$tax_data[, metadata2$SampleID]) == 0
+sum(no_reads)
+
+taxmapobj <- filter_obs(taxmapobj, target = "tax_data", ! no_reads, drop_taxa = TRUE)
+print(taxmapobj)
+
+taxmapobj$data$tax_abund <- calc_taxon_abund(taxmapobj, "tax_data",
+                                             cols = metadata2$SampleID)
+print(taxmapobj)
+
+taxmapobj$data$tax_occ <- calc_n_samples(taxmapobj, "tax_abund", 
+                                         groups = metadata2$IE_dx, 
+                                         cols = metadata2$SampleID)
+
+set.seed(1) # This makes the plot appear the same each time it is run 
+```
+
+Figure 3.8a
+
+```{r, warning=FALSE, message=FALSE}
+heattreeHHS<-heat_tree(taxmapobj, 
+                              node_label = taxon_names,
+                              node_size = n_obs,
+                              node_size_range = c(0.01,0.05),
+                              edge_size_range = c(0.005, 0.005),
+                              node_color = Healthy,
+                              title = "Bacteria Species in Saliva of Healthy Human Samples",
+                              title_size = 0.04,
+                              node_size_axis_label = "OTU count",
+                              node_color_axis_label = "Samples with reads",
+                              layout = "davidson-harel", # The primary layout algorithm
+                              initial_layout = "reingold-tilford")# The primary layout algorithm
+heattreeHHS
+```
+
+Figure 3.8b
+
+```{r, warning=FALSE, message=FALSE}
+heattreeIE<-heat_tree(taxmapobj, 
+                      node_label = taxon_names,
+                      node_size = n_obs,
+                      node_size_range = c(0.01,0.05),
+                      edge_size_range = c(0.005, 0.005),
+                      node_color = Definite_IE,
+                      title = "Bacteria Species in Saliva of Patients with Definite IE",
+                      title_size = 0.04,
+                      node_size_axis_label = "OTU count",
+                      node_color_axis_label = "Samples with reads",
+                      layout = "davidson-harel", # The primary layout algorithm
+                      initial_layout = "reingold-tilford")# The primary layout algorithm
+
+heattreeIE
+```
+
+Figure 3.8b
+
+```{r, warning=FALSE, message=FALSE}
+heattreehighriskIE<-heat_tree(taxmapobj, 
+                              node_label = taxon_names,
+                              node_size = n_obs,
+                              node_size_range = c(0.01,0.05),
+                              edge_size_range = c(0.005, 0.005),
+                              node_color = Highrisk_IE,
+                              title = "Bacteria Species in Saliva of Patients with High Risk IE",
+                              title_size = 0.04,
+                              node_size_axis_label = "OTU count",
+                              node_color_axis_label = "Samples with reads",
+                              layout = "davidson-harel", # The primary layout algorithm
+                              initial_layout = "reingold-tilford")# The primary layout algorithm
+heattreehighriskIE
+```
+
+Figure 3.9a 
+
+```{r, warning=FALSE, message=FALSE}
+abundance_phylum<-ggplot(data = pd, aes(x = Phylum, y = Abundance)) + 
+                    geom_bar(stat = 'identity', aes(fill = IE_dx),width = 0.5) + 
+                    theme_minimal()+
+                    theme(plot.title=element_text(size=12),
+                                legend.position="top",
+                                legend.title = element_text(size=11),
+                                legend.text=element_text(size=8),
+                                legend.key.size=unit(0.5,"cm"),
+                                axis.text = element_text(size = 12),
+                                axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+                            scale_fill_manual(name='Diagnosis',limits=c("Definite_IE","Healthy", "Highrisk_IE"), 
+                                              labels=c("Definite IE","Healthy", "High risk IE"), values=c("skyblue", "orange", "purple"))+
+                    ggtitle("Oral Microbial Abundance by Phylum") +
+                    xlab("Phylum")+
+                    ylab("Abundance")
+
+abundance_phylum
+```
+
+Figure 3.9b
+
+```{r, warning=FALSE, message=FALSE}
+pd$IE_dx = factor(pd$IE_dx, levels=c("Healthy", "Definite_IE", "Highrisk_IE"))
+abundance_genus<-ggplot(data = pd, aes(x = Genus, y = Abundance)) + 
+  geom_bar(stat = 'identity', aes(fill = IE_dx),width = 0.5) + 
+  theme_minimal()+ 
+  theme(plot.title=element_text(size=20),
+        legend.position="top",
+        legend.title = element_text(size=11),
+        legend.text=element_text(size=8),
+        legend.key.size=unit(0.5,"cm"),
+        axis.text = element_text(size = 12),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+  scale_fill_manual(name='Diagnosis',limits=c("Definite_IE","Healthy", "Highrisk_IE"), 
+                    labels=c("Definite IE","Healthy", "High risk IE"), values=c("skyblue", "orange", "purple"))+
+  ggtitle("Oral Microbial Abundance by Genus")+
+  xlab("Genus")+
+  ylab("Abundance")
+
+abundance_genus
+```
+
+Figure 3.9c
+
+```{r, warning=FALSE, message=FALSE}
+relabundance_diagnosis1<-ggplot(data = pd, aes(x = Phylum, y = Abundance)) + 
+  geom_bar(stat = 'identity', position= "fill", aes(fill = IE_dx),width = 0.5) +
+  theme_minimal()+
+  theme(plot.title=element_text(size=12),
+        legend.position="top",
+        legend.title = element_text(size=11),
+        legend.text=element_text(size=8),
+        legend.key.size=unit(0.5,"cm"),
+        axis.text = element_text(size = 12),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+  labs(x = "Clinical Diagnosis", y = "Relative abundance (%)")+
+  scale_fill_manual(name='Diagnosis',limits=c("Definite_IE","Healthy", "Highrisk_IE"), 
+                    labels=c("Definite IE","Healthy", "High risk IE"), values=c("skyblue", "orange", "purple"))+
+  ggtitle("Relative Abundance by Diagnosis (Phylum)") +
+  xlab("Phylum")+
+  ylab("Abundance")
+
+relabundance_diagnosis1
+```
+
+Figure 3.9d
+
+```{r, warning=FALSE, message=FALSE}
+px<-pd
+px$Genus[px$Genus==0]=NA
+relabundance_diagnosis2<-ggplot(data = pd, aes(x = Genus, y = Abundance, na.rm=T)) + 
+  geom_bar(stat = 'identity', position= "fill", aes(fill = IE_dx),width = 0.5) +
+  theme_minimal()+
+  theme(plot.title=element_text(size=20),
+        legend.position="top",
+        legend.title = element_text(size=11),
+        legend.text=element_text(size=8),
+        legend.key.size=unit(0.5,"cm"),
+        axis.text = element_text(size = 12),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+  labs(x = "Clinical Diagnosis", y = "Relative abundance (%)") +
+  scale_fill_manual(name="Diagnosis",limits=c("Definite_IE","Healthy", "Highrisk_IE"), 
+                    labels=c("Definite IE","Healthy", "High risk IE"), values=c("skyblue", "orange", "purple"))+
+  ggtitle("Relative Abundance by Diagnosis (Genus)") +
+  xlab("Genus")+
+  ylab("Abundance")
+
+relabundance_diagnosis2
+```
+
+Figure 3.10a
+
+```{r, warning=FALSE, message=FALSE}
+heatmap_allspecies<-plot_heatmap(phylo_obj, method = "NMDS", distance = "bray",
+                          sample.label = "SampleID", taxa.label = "Species", 
+                          taxa.order = "Species", na.value="white", low="white", high="red") +
+                          theme(legend.position = "top", legend.text =element_text(size=8), legend.key.width = unit(1.5, "cm"))+
+                          ggtitle("Species abundance across all samples (NMDS)")+
+                          scale_x_discrete(limits=c("272IE","290IE", "294IE", "295IE","SRS014468", "SRS014692", "SRS013942", "SRS147126", "SRS104275", "SRS065518", "273IE", "293IE", "296IE"))
+heatmap_allspecies
+```
+
+show most abundant OTU
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+sample_sums(phylo_obj)
+median(sample_sums(phylo_obj))
+total = median(sample_sums(phylo_obj))
+abundant_OTU2 = phyloseq::filter_taxa(phylo_obj, function(x) sum(x>total*0.20)>0, TRUE)
+abundant_OTU2
+
+IE_abundant = subset_samples(abundant_OTU2, IE_dx=="Definite_IE")
+HR_abundant = subset_samples(abundant_OTU2, IE_dx=="Highrisk_IE")
+HHS_abundant = subset_samples(abundant_OTU2, IE_dx=="Healthy")
+```
+
+Figure 3.10b
+
+```{r, warning=FALSE, message=FALSE}
+IE_abundant_heatmap2 <- plot_heatmap(IE_abundant, method = "NMDS", 
+                                    distance = "euclidean", 
+                                    taxa.label = "Species", 
+                                    taxa.order = "Species", 
+                                    trans=NULL, 
+                                    low="white", 
+                                    high="skyblue", 
+                                    na.value="white", 
+                                    sample.label = "SampleID")+
+                                    ggtitle("Abundant species in \nDefinite IE samples(NMDS)")+
+                                    theme(plot.title=element_text(size=17),
+                                      legend.position = "top", 
+                                          legend.text =element_text(size=8), 
+                                          legend.key.width = unit(1.5, "cm"), 
+                                          axis.text.x = element_text(angle = 90, 
+                                                                     hjust = 1, 
+                                                                     vjust=0.5),
+                                          axis.text.y=element_text(size=11))
+IE_abundant_heatmap2
+```
+
+Figure 3.10c
+
+```{r, warning=FALSE, message=FALSE}
+HR_abundant_heatmap2<-plot_heatmap(HR_abundant, method = "NMDS",
+                                   distance = "euclidean", 
+                                   taxa.label = "Species", 
+                                   taxa.order = "Species", 
+                                   trans=NULL, 
+                                   low="white", 
+                                   high="purple", 
+                                   na.value="white", 
+                                   sample.label = "SampleID")+
+                                  ggtitle("Abundant species in \nHigh Risk IE samples(NMDS)")+
+  theme(plot.title=element_text(size=17),
+        legend.position = "top", 
+        legend.text =element_text(size=8), 
+        legend.key.width = unit(1.5, "cm"), 
+        axis.text.x = element_text(angle = 90, 
+                                   hjust = 1, 
+                                   vjust=0.5),
+        axis.text.y=element_text(size=11))
+HR_abundant_heatmap2
+```
+
+Figure 3.10d
+
+```{r, warning=FALSE, message=FALSE}
+HHS_abundant_heatmap2<-plot_heatmap(HHS_abundant, method = "NMDS",
+                                   distance = "euclidean", 
+                                   taxa.label = "Species", 
+                                   taxa.order = "Species", 
+                                   trans=NULL, 
+                                   low="white", 
+                                   high="orange", 
+                                   na.value="white", 
+                                   sample.label = "SampleID")+
+                                  ggtitle("Abundant species in \nHHS samples(NMDS)")+
+  theme(plot.title=element_text(size=17),
+        legend.position = "top", 
+        legend.text =element_text(size=8), 
+        legend.key.width = unit(1.5, "cm"), 
+        axis.text.x = element_text(angle = 90, 
+                                   hjust = 1, 
+                                   vjust=0.5),
+        axis.text.y=element_text(size=11))
+HHS_abundant_heatmap2
+```
+
+Figure 3.12a
+
+```{r, warning=FALSE, message=FALSE}
+HHS_netplot<-plot_net(HHS_abundant, 
+                     distance = "(A+B-2*J)/(A+B)", 
+                     type = "taxa",
+                     maxdist = 0.5, 
+                     color="Phylum", 
+                     point_label="Species", 
+                     point_size = 7, 
+                     point_alpha=0.5,
+                     laymeth="circle", 
+                     hjust=0.5,
+                     rescale = 0.3)+
+                    theme(legend.position = "none")+
+                    ggtitle("Network plot for Salivary Microbial Species in HHS Samples")
+HHS_netplot
+```
+
+Figure 3.12b
+
+```{r, warning=FALSE, message=FALSE}
+IE_netplot<-plot_net(IE_abundant, 
+                     distance = "(A+B-2*J)/(A+B)", 
+                     type = "taxa",
+                     maxdist = 0.5, 
+                     color="Phylum", 
+                     point_label="Species", 
+                     point_size = 7, 
+                     point_alpha=0.5,
+                     laymeth="circle", 
+                     hjust=0.5,
+                     rescale = 0.3)+
+  theme(legend.position = "none")+
+              ggtitle("Network plot for Salivary Microbial Species in Definite IE Samples")
+IE_netplot
+```
+
+Figure 3.12c
+
+```{r, warning=FALSE, message=FALSE}
+HR_netplot<-plot_net(HR_abundant, 
+                     distance = "(A+B-2*J)/(A+B)", 
+                     type = "taxa",
+                     maxdist = 0.5, 
+                     color="Phylum", 
+                     point_label="Species", 
+                     point_size = 7, 
+                     point_alpha=0.5,
+                     laymeth="circle", 
+                     hjust=0.5,
+                     rescale = 0.3)+
+  theme(legend.position = "none")+
+        ggtitle("Network plot for Salivary Microbial Species in High risk IE Samples")
+HR_netplot
+```

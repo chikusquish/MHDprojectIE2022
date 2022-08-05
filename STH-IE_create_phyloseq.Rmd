@@ -1,0 +1,250 @@
+---
+title: "TMSC1TMHD 2021/2022 Dissertation Appendix File1 - STH Pseudocodes"
+author: "Phoebe Cheong"
+date: "04/08/2022"
+output:
+  html_document:
+    toc: yes
+    keep_md: yes
+  word_document:
+    toc: yes
+---
+
+Files can be downloaded from:https://github.com/chikusquish/MHDprojectIE2022
+
+## STH-IE 1. Create phyloseq object
+
+**Install packages** for this session. Packages are as shown in: https://github.com/chikusquish/MHDprojectIE2022/blob/main/R-pseudocodes
+
+**Load libraries** for this session
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+library(writexl)
+library(readxl)
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(phyloseq)
+library(microbiome)
+library(vegan)
+library(stringr)
+library(tidyverse)
+library(devtools)
+library(pairwiseAdonis)
+load("STH-IE create phyloseq object.RData")
+```
+
+The first step of creating the phyloseq object is to modify the merged_estimated_read.txt file.
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+main=read.table('HHS_IE_merged_estimated_number_read.txt',header=TRUE,sep="\t")
+t = separate(main,X.clade_name, into = c("Kingdom","Phylum", "Class", "Order", "Family", "Genus", "Species"), sep="\\|")
+t=t[!is.na(t$Species), ]
+t=t[!duplicated(t$Species),]
+t = t %>% mutate(Kingdom = str_replace(Kingdom, 'k__',''),
+                 Phylum = str_replace(Phylum, 'p__',''),
+                 Class = str_replace(Class, 'c__',''),
+                 Order = str_replace(Order, 'o__',''),
+                 Family = str_replace(Family, 'f__',''),
+                 Genus = str_replace(Genus, 'g__',''),
+                 Species = str_replace(Species, 's__',''))
+names(t)[names(t) == 'X272IE_S111_profile_IEcount.txt'] <- "272IE"
+names(t)[names(t) == 'X273IE_S112_profile_IEcount.txt'] <- "273IE"
+names(t)[names(t) == 'X290IE_S113_profile_IEcount.txt'] <- "290IE"
+names(t)[names(t) == 'X293IE_S13_profile_IEcount.txt'] <- "293IE"
+names(t)[names(t) == 'X294IE_S114_profile_IEcount.txt'] <- "294IE"
+names(t)[names(t) == 'X295IE_S14_profile_IEcount.txt'] <- "295IE"
+names(t)[names(t) == 'X296IE_S115_profile_IEcount.txt'] <- "296IE"
+names(t)[names(t) == 'SRS013942_profile_count.txt'] <- "SRS013942"
+names(t)[names(t) == 'SRS014468_profile_count.txt'] <- "SRS014468"
+names(t)[names(t) == 'SRS014692_profile_count.txt'] <- "SRS014692"
+names(t)[names(t) == 'SRS015055_profile_count.txt'] <- "SRS015055"
+names(t)[names(t) == 'SRS019120_profile_count.txt'] <- "SRS019120"
+names(t)[names(t) == 'SRS065518_profile_count.txt'] <- "SRS065518"
+names(t)[names(t) == 'SRS104275_profile_count.txt'] <- "SRS104275"
+names(t)[names(t) == 'SRS147126_profile_count.txt'] <- "SRS147126"
+
+t=as.data.frame(t[,-which(names(t) %in% c("SRS015055", "SRS019120"))])
+t = t %>% mutate(Genus = str_replace(Genus, 'Clostridiales_Family_XIII_Incertae_Sedis_unclassified','Clostridiales**'))
+
+x=1:dim(t)[1]
+OTUs= paste("OTU",x)
+t=add_column(t, OTUs = OTUs, .before = "clade_taxid")
+t[is.na(t)] = 0
+write_xlsx(t,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_Estimated_number_TX.xlsx")
+```
+
+1.  Create CountMatrix
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+OTU =as.data.frame(t[,-which(names(t) %in% c("Kingdom","Phylum", "Class", "Order", "Family", "Genus","Type","clade_taxid"))])
+write_xlsx(OTU,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_OTU.xlsx")
+
+row.names(OTU) = OTU$OTUs
+OTU =as.data.frame(OTU[,-which(names(OTU) %in% c("OTUs","Species"))])
+OTU [is.na(OTU)] = 0
+
+names(OTU) = gsub(pattern = "_profile_IEcount.txt", replacement = "", x = names(OTU))
+names(OTU) = gsub(pattern = "_profile_count.txt", replacement = "", x = names(OTU))
+
+OTU_modify<-t(OTU)%>%as.data.frame
+  
+OTU_modify2<-OTU_modify[,-which(names(OTU_modify) %in% c("OTU 196","OTU 197", "OTU 198", "OTU 199", "OTU 200", "OTU 202", "OTU 205", 
+                             "OTU 206", "OTU 207", "OTU 210", "OTU 212", "OTU 213", "OTU 214", "OTU 215",
+                             "OTU 216", "OTU 219", "OTU 220"))]
+OTU_modify3<-t(OTU_modify2)%>%as.data.frame
+CountMatrix = OTU_modify3 %>% as.matrix()
+mode(CountMatrix) <- 'integer'
+```
+
+2.  Create TaxaMatrix
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+TAX =as.data.frame(t[,which(names(t) %in% c("Kingdom","Phylum", "Class", "Order", "Family", "Genus","Species","OTUs"))])
+write_xlsx(TAX,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/HHS_IE_TAXA.xlsx")
+
+row.names(TAX) = TAX$OTUs
+tax_modify = t(TAX)%>%as.data.frame
+tax_modify2<-tax_modify[,-which(names(tax_modify) %in% c("OTU 196","OTU 197", "OTU 198", "OTU 199", "OTU 200", "OTU 202", "OTU 205", 
+                                                         "OTU 206", "OTU 207", "OTU 210", "OTU 212", "OTU 213", "OTU 214", "OTU 215",
+                                                         "OTU 216", "OTU 219", "OTU 220"))]
+tax_modify3<-t(tax_modify2)%>%as.data.frame
+tax_modify3 =as.data.frame(tax_modify3[,-which(names(tax_modify3) %in% c("OTUs"))])
+TaxaMatrix <- tax_modify3 %>% as.matrix()
+```
+
+3.  Load metadata and create sampleData
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+Metadata <- read_xlsx("~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/Metadata_HHS_IE.xlsx", sheet="Merged_Projects") %>% as.data.frame()
+rownames(Metadata) <- Metadata$SampleID
+```
+
+4.  Create phyloseq object from all three items above
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+otuTABLE <- otu_table(CountMatrix, taxa_are_rows = TRUE)
+taxTABLE <- tax_table(TaxaMatrix)
+sampleDATA <- sample_data(Metadata)
+```
+
+```{r}
+phylo_obj <- phyloseq(otuTABLE, taxTABLE, sampleDATA)
+phylo_obj
+```
+
+## STH-IE 2. Run statistical tests on taxa results
+
+Extract abundance profiles, metadata and microbiome taxonomy from phyloseq object
+```{r, results='hide', warning=FALSE, message=FALSE}
+OTUdata <- abundances(phylo_obj)#extract abundance profiles 
+SampleData <- meta(phylo_obj)#extract meta data
+TAXAData <- as.data.frame(tax_table(phylo_obj)@.Data)#extract taxonomy of microbiome
+
+Adiv <- estimate_richness(phylo_obj,measures=c("Observed","Chao1","ACE","Shannon","Simpson","InvSimpson"))
+rownames(Adiv)
+row.names(Adiv) <- c("272IE", "273IE", "290IE", "293IE", "294IE", "295IE", "296IE", "SRS013942", "SRS014468", "SRS014692", "SRS065518", "SRS104275", "SRS147126")
+Adiv$SampleID <- c("272IE", "273IE", "290IE", "293IE", "294IE", "295IE", "296IE", "SRS013942", "SRS014468", "SRS014692", "SRS065518", "SRS104275", "SRS147126")
+write_xlsx(Adiv,"~/Desktop/Mod5_Data_Analysis/HHS_IE_combined/Adiv_HHS_IE.xlsx")
+Adiv <- full_join(SampleData,Adiv,by="SampleID")#full_join function from dplyr
+```
+
+Insert Shannon Evenness Index
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+H <- Adiv$Shannon
+S1 <- Adiv$Observed
+S <- log(S1)
+evenness <- H/S
+evenness
+Adiv$Evenness = evenness
+```
+
+**Analyse alpha diversity**: Determine index for analysis
+
+```{r}
+index_defIE<-which(Adiv$IE_dx=="Definite_IE")
+index_hrIE<-which(Adiv$IE_dx=="Highrisk_IE")
+index_HHS<-which(Adiv$IE_dx=="Healthy")
+```
+
+Shapiro-Wilk test: check normality of data
+
+```{r}
+shapiro.test(Adiv$Shannon)#### p>0.05
+shapiro.test(Adiv$Chao1)#### p>0.05
+shapiro.test(Adiv$InvSimpson)#### p>0.05
+shapiro.test(Adiv$Evenness)#### p>0.05
+```
+
+All alpha diversity measures are parametric, therefore ANOVA is used to analyse differences in mean.
+
+```{r}
+########## SHANNON ############
+anova_adiv1<-aov(Adiv$Shannon ~ Adiv$IE_dx)
+anova_adiv1
+summary(anova_adiv1)
+```
+
+```{r}
+tukey_IE_HHS1<-TukeyHSD(anova_adiv1)
+tukey_IE_HHS1
+```
+
+```{r}
+########### CHAO1 ############
+anova_adiv2<-aov(Adiv$Chao1 ~ Adiv$IE_dx)
+anova_adiv2
+summary(anova_adiv2)
+```
+
+```{r}
+tukey_IE_HHS2<-TukeyHSD(anova_adiv2)
+tukey_IE_HHS2
+```
+
+```{r}
+########### InvSimpson ############
+anova_adiv3<-aov(Adiv$InvSimpson ~ Adiv$IE_dx)
+anova_adiv3
+summary(anova_adiv3)
+```
+
+```{r}
+tukey_IE_HHS3<-TukeyHSD(anova_adiv3)
+tukey_IE_HHS3
+```
+
+```{r}
+########### Shannon Evenness Index ############
+anova_adiv4<-aov(Adiv$Evenness ~ Adiv$IE_dx)
+anova_adiv4
+summary(anova_adiv4)
+```
+
+**Analyse beta diversity**
+
+```{r, warning=FALSE, message=FALSE}
+#log10 transformation for the abundance data
+phyobj_shift<- microbiome::transform(phylo_obj,transform="log10")
+#beta diversity based on euclidean distance 
+Betdiv <- as.matrix(phyloseq::distance(phyobj_shift, method="bray"))
+Betdiv[1:7, 1:7]
+```
+
+PERMANOVA analysis
+
+```{r, warning=FALSE, message=FALSE}
+SampleData2<-SampleData
+set.seed(1)
+Betdiv_HHS_IE<-adonis2(Betdiv ~ IE_dx, data=SampleData2, permutations=999)
+Betdiv_HHS_IE
+```
+
+PERMANOVA posthoc
+
+```{r, warning=FALSE, message=FALSE}
+betdivposthoc_HHS_IE<-pairwise.adonis(Betdiv,factors=SampleData$IE_dx)
+betdivposthoc_HHS_IE
+```
