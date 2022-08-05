@@ -1,0 +1,13 @@
+use the following packages for pseudocodes
+
+install.packages(c('readxl', 'tidyverse', 'dplyr', 'vegan', 'ggpubr', "writexl"))
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(c('phyloseq', ask = F, update = F))
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(c('microbiome'))
+install.packages('devtools')
+install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis", force=T) 
+install.packages("metacoder")
+install.packages("survminer", "survival")
